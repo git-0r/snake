@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake</title>
+    <style>
+      .main {
+        margin: auto;
+        width: fit-content;
+      }
+
+      .heading {
+        text-align: center;
+      }
+
+      #container {
+        width: 300px;
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        grid-template-rows: repeat(10px, 1fr);
+        border: 1px solid black;
+      }
+
+      .cell {
+        height: 20px;
+      }
+
+      .active {
+        background-color: olivedrab;
+      }
+
+      .fruit {
+        background-color: orangered;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="main">
+      <h1 class="heading">Snake 🐍</h1>
+      <p><span>Score: </span><span id="score">0</span></p>
+      <div id="container"></div>
+      <div>
+        <button id="start_btn">start</button>
+        <button id="stop_btn">stop</button>
+      </div>
+    </main>
+
+    <script>
+      const main = document.getElementsByClassName("main");
+      const container = document.getElementById("container");
+      const start_btn = document.getElementById("start_btn");
+      const stop_btn = document.getElementById("stop_btn");
+      const score_element = document.getElementById("score");
+
+      const targetFPS = 4; // Target updates per second
+      const interval = 1000 / targetFPS; // Milliseconds per frame (33ms for 30 FPS)
+
+      stop_btn.addEventListener("click", () => {
+        stopGameLoop();
+      });
+
+      start_btn.addEventListener("click", () => {
+        startGameLoop();
+      });
+
+      let snake_size = 1;
+      let snake_head;
+      let snake_tail;
+      let fruit = false;
+      let gameOver = false;
+      let score = 0;
+
+      const setScore = ()=> {
+        score++;
+        score_element.innerText = score;
+      }
+
+      // linked list to represent the path, y=row & x=column
+      let new_node = { next: null, data: { i: 2, j: 1 } };
+      let list_head = { next: new_node, data: { i: 2, j: 0 } };
+      let list_tail = new_node;
+
+      //   intial values of snake head/tail
+      snake_head = list_head;
+
+      //   grid size nxn
+      const grid_width = 12;
+      const grid_height = 6;
+
+      //   next step based on the key press
+      let next_step = "right";
+
+      document.addEventListener("keydown", (event) => {
+        switch (event.key) {
+          case "ArrowUp":
+            if (next_step !== "up" && next_step !== "down") next_step = "up";
+            break;
+          case "ArrowDown":
+            if (next_step !== "down" && next_step !== "up") next_step = "down";
+            break;
+          case "ArrowLeft":
+            if (next_step !== "left" && next_step !== "right")
+              next_step = "left";
+            break;
+          case "ArrowRight":
+            if (next_step !== "right" && next_step !== "left")
+              next_step = "right";
+            break;
+          default:
+            break;
+        }
+      });
+
+      // map to track existing nodes in path/linked-list
+      const path_map = {
+        20: "20",
+      };
+
+      //   render grid
+
+      const render_grid = () => {
+        for (let i = 0; i < grid_height; i++) {
+          for (let j = 0; j < grid_width; j++) {
+            const div = document.createElement("div");
+            div.classList.add("cell");
+            div.id = `${i}${j}`;
+            container.appendChild(div);
+          }
+        }
+      };
+
+      render_grid();
+
+      //   render snake
+
+      const render_snake = () => {
+        const activeCells = document.getElementsByClassName("active");
+
+        [...activeCells].forEach((cell) => cell.classList.remove("active"));
+
+        let count = 0;
+        let current = list_head;
+
+        while (count < snake_size && current) {
+          document
+            .getElementById(`${current.data.i}${current.data.j}`)
+            ?.classList.add("active");
+          current = current.next;
+        }
+      };
+
+      const render_fruit = () => {
+        let random_i = Math.floor(Math.random() * 6);
+        let random_j = Math.floor(Math.random() * 6);
+
+        if (!path_map[`${random_i}${random_j}`]) {
+          document
+            .getElementById(`${random_i}${random_j}`)
+            ?.classList.add("fruit");
+          fruit = `${random_i}${random_j}`;
+        }
+      };
+
+      const remove_fruit = (i, j) => {
+        document.getElementById(`${i}${j}`)?.classList.remove("fruit");
+      };
+
+      const update_next_step = (i, j) => {
+        const new_node = {
+          next: null,
+          data: { i, j },
+        };
+
+        const cellId = `${i}${j}`;
+
+        const path_map_value = path_map[cellId];
+
+        if (path_map_value) {
+          gameOver = true;
+          return;
+        }
+
+        list_tail.next = new_node;
+        list_tail = new_node;
+
+        path_map[cellId] = cellId;
+
+        if (cellId === fruit) {
+          fruit = false;
+          remove_fruit(i, j);
+          setScore();
+          return;
+        }
+
+        const node_to_be_deleted = list_head;
+        list_head = list_head.next;
+        node_to_be_deleted.next = null;
+        delete path_map[
+          `${node_to_be_deleted.data.i}${node_to_be_deleted.data.j}`
+        ];
+      };
+
+      const go_to_next_step = () => {
+        switch (next_step) {
+          case "right": {
+            const i = list_tail.data.i;
+            const j =
+              list_tail.data.j === grid_width - 1 ? 0 : list_tail.data.j + 1;
+            update_next_step(i, j);
+            break;
+          }
+
+          case "up": {
+            const i =
+              list_tail.data.i === 0 ? grid_height - 1 : list_tail.data.i - 1;
+            const j = list_tail.data.j;
+            update_next_step(i, j);
+            break;
+          }
+
+          case "down": {
+            const i =
+              list_tail.data.i === grid_height - 1 ? 0 : list_tail.data.i + 1;
+            const j = list_tail.data.j;
+            update_next_step(i, j);
+
+            break;
+          }
+
+          case "left": {
+            const i = list_tail.data.i;
+            const j =
+              list_tail.data.j === 0 ? grid_width - 1 : list_tail.data.j - 1;
+            update_next_step(i, j);
+            break;
+          }
+
+          default:
+            break;
+        }
+      };
+
+      let lastUpdateTime = 0;
+      let animationId;
+
+      const gameLoop = (timestamp) => {
+        if (gameOver) {
+          stopGameLoop();
+          const p = document.createElement("p");
+          p.innerText = "Game over!";
+          main[0]?.appendChild(p);
+          console.log("gameloop stop!");
+          return;
+        }
+        console.log("gameloop run!");
+        // Check if it's time to update the game state
+        if (timestamp - lastUpdateTime >= interval) {
+          go_to_next_step();
+          render_snake();
+          !fruit && render_fruit();
+          lastUpdateTime = timestamp;
+        }
+
+        // Request the next frame
+        animationId = requestAnimationFrame(gameLoop);
+      };
+
+      // Request the next frame
+      animationId = requestAnimationFrame(gameLoop);
+
+      function stopGameLoop() {
+        cancelAnimationFrame(animationId);
+      }
+
+      function startGameLoop() {
+        if(gameOver) return;
+        animationId = requestAnimationFrame(gameLoop);
+      }
+    </script>
+  </body>
+</html>
